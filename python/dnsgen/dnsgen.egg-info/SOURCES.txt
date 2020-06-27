@@ -1,0 +1,15 @@
+LICENSE
+MANIFEST.in
+README.md
+requirements.txt
+setup.py
+dnsgen/__init__.py
+dnsgen/cli.py
+dnsgen/dnsgen.py
+dnsgen/words.txt
+dnsgen.egg-info/PKG-INFO
+dnsgen.egg-info/SOURCES.txt
+dnsgen.egg-info/dependency_links.txt
+dnsgen.egg-info/entry_points.txt
+dnsgen.egg-info/requires.txt
+dnsgen.egg-info/top_level.txt
