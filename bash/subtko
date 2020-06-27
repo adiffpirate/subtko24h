@@ -1,0 +1,38 @@
+#!/bin/bash
+source ~/.bash_aliases
+source ~/.tokens
+
+#check(){
+#	for subdomain in `cat .tempSUBTAKE | grep -i ${1}: | awk 'NF>1{print $NF}' | sort -u`; do 
+#		jar-subtake-${1} $subdomain | grep "takeover isnt possible" > /dev/null \
+#			&& sed -i "/${subdomain}/d" .tempSUBTAKE
+#	done
+#}
+
+cd ~/recon
+mv possibleTakeovers possibleTakeoversOLD
+temp=$(mktemp)
+echo "----------"
+echo -e "\e[90m$(date "+%d/%m/%y %H:%M:%S")\e[0m"
+echo "Testing takeover on each subdomain that starts with the letter:"
+for letter in {a..z}; do
+	echo -n "${letter}: "
+	mysql -Be "SELECT subdomain FROM recon.data WHERE subdomain LIKE '${letter}%'" | tail -n +2 \
+		| sed 's/^/https:\/\//g' |  nuclei subdomain-takeover/detect-all-takeovers.yaml > $temp
+	#check fastly
+	#check shopify
+	#check fly.io
+	#check unbounce
+
+	takeoversQnt=$(cat $temp | wc -l)
+	if [ ${takeoversQnt} -gt 0 ]; then
+		echo -e "\e[92m${takeoversQnt} possible takeovers found\e[0m"
+	else
+		echo -e "\e[90m0 possible takeovers found\e[0m"
+	fi
+	cat $temp >> possibleTakeovers #saves possible takeovers found
+	# Send possible takeovers discovered to slack channel
+	http POST https://slack.com/api/chat.postMessage Authorization:"Bearer $SLACK_TOKEN" channel='C015Y6YPN8N' text="$( [[ -s $temp ]] && cat $temp)" &>/dev/null
+done; rm $temp
+echo -e "\e[90m$(date "+%d/%m/%y %H:%M:%S")\e[0m"
+echo "----------"

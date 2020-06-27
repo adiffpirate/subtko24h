@@ -1,0 +1,98 @@
+#!/bin/bash
+source ~/.bash_aliases
+export amass subfinder gitsubs resolve nonwc makesubwl
+
+passive(){
+	local data=$(mktemp)
+
+	echo "Running passive search tools" >&2
+	echo -e "\tAmass" >&2
+	amass ${1} | sed 's/$/ amass/g' > $data
+	echo -e "\tSubfinder" >&2
+	subfinder ${1} | sed 's/$/ subfinder/g' >> $data
+	echo -e "\tGitsubs" >&2
+	gitsubs ${1} | sed 's/$/ gitsubs/g' >> $data
+
+	echo "Checking for alives" >&2
+	sort $data -u -t ' ' -k 1,1 -o $data # Sort and unique by key (first column)
+	awk '{print $1}' $data | resolve | nonwc | xargs -n1 -I{} bash -c "sed -i '/^{} / s/$/ alive/' $data"
+	sed -i "/ alive$/!s/$/ dead/g" $data
+
+	sort $data -u -t ' ' -k 1,1
+	rm $data
+}
+
+brute(){
+	echo "Bruteforcing" >&2
+	makesubwl ${1} | resolve | nonwc | sed 's/$/ bruteforce alive/g'
+}
+
+quick(){
+	passive $1
+}
+
+medium(){
+	local data=$(mktemp)
+	
+	quick $1 > $data
+	brute $1 >> $data
+
+	sort $data -u -t ' ' -k 1,1
+	rm $data
+}
+
+full(){
+	local data=$(mktemp)
+	
+	medium $1 > $data
+
+	echo "Running dnsgen" >&2
+	grep -F ' alive' $data | awk '{print $1}' | dnsgen -w ${hacktools}/wordlists/dnsgen - \
+		| resolve | nonwc | sed 's/$/ dnsgen alive/g' >> $data
+
+	sort $data -u -t ' ' -k 1,1
+	rm $data
+}
+
+enum(){ 
+	local prevDiscSubs=$(mktemp); if [[ -n $2 ]]; then cat $2 > $prevDiscSubs; fi
+	local data=$(mktemp)
+
+	while read domain; do
+		echo "+++++++++++++++++++++" >&2
+		date "+%d/%m/%y %H:%M:%S" >&2
+		echo "--- ${domain} ---" >&2
+		#if domain is not a wildcard
+		if [[ $(echo ${domain} | nonwc 2>/dev/null | wc -l) -eq 1 ]]; then
+			if [[ $1 == 'passive' ]]; then
+				passive $domain > $data
+			fi; if [[ $1 == 'brute' ]]; then
+				brute $domain > $data
+			fi; if [[ $1 == 'quick' ]]; then
+				quick $domain > $data
+			fi; if [[ $1 == 'medium' ]]; then
+				medium $domain > $data
+			fi; if [[ $1 == 'full' ]]; then
+				full $domain > $data
+			fi
+			
+			if [[ -s $prevDiscSubs ]]; then
+				echo "Checking previously discovered subdomains" >&2
+				grep $prevDiscSubs -vFf <(awk '{print $1}' ${data}) | resolve | nonwc | sed 's/$/ NULL alive/g' >> $data
+				grep $prevDiscSubs -vFf <(awk '{print $1}' ${data}) | sed 's/$/ NULL dead/g' >> $data
+				sort $data -u -t ' ' -k 1,1
+			else
+				cat $data
+			fi
+		else
+			echo "Skipping this domain cause its a wildcard" >&2
+		fi
+		echo "------------------" >&2
+		date "+%d/%m/%y %H:%M:%S" >&2
+		echo "+++++++++++++++++++++" >&2
+		echo "$(cat $data | grep ' alive' | wc -l) subdomains alive" >&2
+		echo "$(cat $data | grep ' dead' | wc -l) subdomains dead" >&2
+	done; rm $data $prevDiscSubs
+}
+
+enum $1 $2
