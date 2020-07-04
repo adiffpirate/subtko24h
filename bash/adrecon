@@ -1,6 +1,6 @@
 #!/bin/bash
 source ~/.bash_aliases
-export amass subfinder gitsubs resolve nonwc makesubwl
+export amass subfinder gitsubs resolve nonwc makesubwl getsubs
 
 passive(){
 	local data=$(mktemp)
@@ -55,14 +55,13 @@ full(){
 }
 
 enum(){ 
-	local prevDiscSubs=$(mktemp); if [[ -n $2 ]]; then cat $2 > $prevDiscSubs; fi
 	local data=$(mktemp)
 
 	while read domain; do
 		echo "+++++++++++++++++++++" >&2
 		date "+%d/%m/%y %H:%M:%S" >&2
 		echo "--- ${domain} ---" >&2
-		#if domain is not a wildcard
+		# If domain is not a wildcard
 		if [[ $(echo ${domain} | nonwc 2>/dev/null | wc -l) -eq 1 ]]; then
 			if [[ $1 == 'passive' ]]; then
 				passive $domain > $data
@@ -76,14 +75,9 @@ enum(){
 				full $domain > $data
 			fi
 			
-			if [[ -s $prevDiscSubs ]]; then
-				echo "Checking previously discovered subdomains" >&2
-				grep $prevDiscSubs -vFf <(awk '{print $1}' ${data}) | resolve | nonwc | sed 's/$/ NULL alive/g' >> $data
-				grep $prevDiscSubs -vFf <(awk '{print $1}' ${data}) | sed 's/$/ NULL dead/g' >> $data
-				sort $data -u -t ' ' -k 1,1
-			else
-				cat $data
-			fi
+			echo "Checking previously discovered subdomains" >&2
+			getsubs alive $domain | resolve | nonwc | sed 's/$/ NULL alive/g' >> $data
+			sort $data -u -t ' ' -k 1,1
 		else
 			echo "Skipping this domain cause its a wildcard" >&2
 		fi
