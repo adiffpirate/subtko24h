@@ -38,6 +38,27 @@ To keep things simple.
 
 To organize and making it easy to acess/read the data, a mysql database (named "recon") is used with the following tables:
 
-- targets (program VARCHAR(255) NOT NULL, domain VARCHAR(255) PRIMARY KEY)
-- data (domain VARCHAR(255), subdomain VARCHAR(255) PRIMARY KEY, alive BOOLEAN DEFAULT 0, source VARCHAR(255) NOT NULL, modified TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, created TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-- takeovers (url VARCHAR(255) PRIMARY KEY, service VARCHAR(255) NOT NULL, modified TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, created TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+#### targets
+
+> (program VARCHAR(255) NOT NULL, domain VARCHAR(255) PRIMARY KEY)
+
+Domains to perform subdomain enumeration.
+
+#### data 
+
+> (domain VARCHAR(255), subdomain VARCHAR(255) PRIMARY KEY, alive BOOLEAN DEFAULT 0, source VARCHAR(255) NOT NULL, modified TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, created TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+Subdomains that will be tested for takeover.
+
+#### takeovers 
+
+> (url VARCHAR(255) PRIMARY KEY, service VARCHAR(255) NOT NULL, modified TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, created TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+Possible takeovers found.
+
+## Usage
+
+What I do it's running `adrecon24h [quick|medium|full]` alongside `subtko24h` to continuous enumerate subdomains and test them.
+_(A friendly tip here, you can use [screen](https://linuxize.com/post/how-to-use-linux-screen/) to run more than one script at the same time with only one terminal)_
+
+> If you don't want to use adrecon, you can enumerate subdomains in your way and add them to db with <br>`cat {yourSubdomainsList} | addtodb subs`.<br>But be aware that your list MUST have the following format each line: `subdomain source [alive|dead]`
