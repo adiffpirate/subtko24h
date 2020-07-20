@@ -10,7 +10,7 @@ This script is running in cloud using a basic droplet from [digital ocean](https
 
 > It costs me only $5 per month, checking a few tens subdomains per second (it can do more, but I don't think it's necessary since the same subdomain is checked about 3 times a day).
 
-### [Adrecon](https://github.com/adiffpirate/hacktools/blob/master/bash/adrecon)
+### [Adrecon](https://github.com/adiffpirate/hacktools/blob/master/src/adrecon)
 
 Does subdomain enumeration. Currently using:
 
@@ -22,7 +22,7 @@ Does subdomain enumeration. Currently using:
 	- [Massdns](https://github.com/blechschmidt/massdns)
 	- [Dnsgen](https://github.com/ProjectAnte/dnsgen)
 
-### [Subtko](https://github.com/adiffpirate/hacktools/blob/master/bash/subtko)
+### [Subtko](https://github.com/adiffpirate/hacktools/blob/master/src/subtko)
 
 Checks for possible subdomain takeovers using:
 
