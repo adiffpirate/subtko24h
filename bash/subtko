@@ -4,7 +4,7 @@ source ~/hacktools/.aliases
 temp=$(mktemp)
 input=$(mktemp); cat /dev/stdin > $input
 
-cat $input | sed 's/^/https:\/\//g' | nuclei subdomain-takeover/detect-all-takeovers.yaml \
+cat $input | sed 's/^/https:\/\//g' | nuclei detect-all-takeovers.yaml \
 	| while read line; do echo "$(echo $line | cut -d ' ' -f 3 | sed 's/\/$//') $(echo $line | cut -d ':' -f 2 | cut -d ']' -f 1)"; done > $temp
 
 takeoversQnt=$(cat $temp | wc -l)
