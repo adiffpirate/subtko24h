@@ -1,0 +1,213 @@
+source ~/.tokens
+
+set -a
+hacktools="~/hacktools"
+goBin="${hacktools}/go/bin"
+cBin="${hacktools}/c/bin"
+bashPath="${hacktools}/bash"
+pyPath="${hacktools}/python"
+
+count(){
+	cat $1 | wc -l
+}
+
+freshr(){
+	# if one day has passed since last run
+	if [ $(date +%s) -ge $((( $(cat ${hacktools}/util/.lastFreshrDate) + 86400 ))) ]; then
+		date +%s > ${hacktools}/util/.lastFreshrDate
+		echo -n "Freshing up resolvers"
+		python3 ${pyPath}/fresh.py --clean ${hacktools}/util/clean_regex.txt \
+			-o ${hacktools}/util/resolvers.txt &> /dev/null
+		echo -en "\r\e[K" #clear the last line in stdout
+	fi
+}
+
+amass(){
+	${goBin}/amass enum -passive -d $1 2>/dev/null
+}
+
+subfinder(){
+	${goBin}/subfinder -d $1 -silent
+}
+
+gitsubs(){
+	local temp=$(mktemp)
+	for i in {1..5}; do
+		python3 ${pyPath}/github-subdomains.py -d $1 -t $GITHUB_TOKEN >> $temp
+		sleep 5
+	done
+	sort -u $temp
+	rm $temp
+}
+
+massdns(){
+	freshr
+	if [[ -n $1 ]]; then
+		local resolvers="$1"
+	else
+		local resolvers="${hacktools}/util/resolvers.txt"
+	fi
+	${cBin}/massdns -q -r $resolvers -s 1000 -o S | awk '{print $1}' | sed 's/\.$//g' | sort -u
+}
+
+resolve(){
+	massdns | tee >(wc -l | sed 's/$/ at first/;s/^/\t/' >&2) \
+		| massdns ${hacktools}/util/top-resolvers.txt \
+		| tee >(wc -l | sed 's/$/ after double check/;s/^/\t/' >&2)
+}
+
+nonwc(){
+        local subdomains=$(mktemp)
+        cat /dev/stdin > $subdomains
+        grep $subdomains -vFf <(sed 's/^/testingforwildcard123./g' $subdomains | resolve 2>/dev/null\
+                | cut -d '.' -f 2- | sed 's/^/plsdontgimmearesult./g' | resolve 2>/dev/null | cut -d '.' -f 2- ) \
+                | tee >(wc -l | sed 's/^/\t/;s/$/ non wildcards/' >&2)
+        rm $subdomains
+}
+
+alias dnsgen="dnsgen -w ${hacktools}/wordlists/dnsgen"
+
+makesubwl(){
+	python3 ${pyPath}/subbrute.py ${hacktools}/wordlists/subdomains $1
+}
+
+nuclei(){
+	$goBin/nuclei -t $hacktools/util/nuclei-templates/$1 -silent -c 100
+}
+
+alias anew="${goBin}/anew"
+
+gettargets(){
+	mysql -Be 'SELECT domain FROM recon.targets ORDER BY domain' | tail -n +2
+}
+
+getsubs(){
+	if [[ -z $2 ]]; then
+		if [[ $1 == 'alive' ]]; then
+			mysql -Be 'SELECT subdomain FROM recon.data WHERE alive = 1 ORDER BY subdomain' | tail -n +2
+		fi; if [[ $1 == 'all' ]]; then
+			mysql -Be 'SELECT subdomain FROM recon.data ORDER BY subdomain' | tail -n +2
+		fi; if [[ $1 == 'dead' ]]; then
+			mysql -Be 'SELECT subdomain FROM recon.data WHERE alive = 0 ORDER BY subdomain' | tail -n +2
+		fi
+	else
+		if [[ $1 == 'alive' ]]; then
+			mysql -Be "SELECT subdomain FROM recon.data WHERE alive = 1 AND domain = '$2' ORDER BY subdomain" | tail -n +2
+		fi; if [[ $1 == 'all' ]]; then
+			mysql -Be "SELECT subdomain FROM recon.data WHERE domain = '$2' ORDER BY subdomain" | tail -n +2
+		fi; if [[ $1 == 'dead' ]]; then
+			mysql -Be "SELECT subdomain FROM recon.data WHERE alive = 0 AND domain = '$2' ORDER BY subdomain" | tail -n +2
+		fi
+	fi
+}
+
+updatetools(){
+	if [[ $1 == 'adrecon' ]]; then
+		if [[ $(curl https://github.com/OWASP/Amass/releases/latest 2>/dev/null | cut -d '"' -f 2 | rev | cut -d '/' -f 1 | rev) \
+			!= $(~/hacktools/go/bin/amass --version 2>&1) ]]; then
+			echo "Updating AMASS" >&2
+			go get -v github.com/OWASP/Amass/v3/... &>/dev/null
+		fi
+
+		if [[ $(curl https://github.com/projectdiscovery/subfinder/releases/latest 2>/dev/null | cut -d '"' -f 2 | rev | cut -d '/' -f 1 | rev) \
+			!= $(~/hacktools/go/bin/subfinder --version 2>&1 | grep Version | cut -d ' ' -f 4 | sed 's/^/v/') ]]; then
+			echo "Updating SUBFINDER" >&2
+			go get -u -v github.com/projectdiscovery/subfinder/cmd/subfinder
+		fi
+	fi
+}
+
+set +a
+
+addtarget(){
+	if [[ -n "${2}" ]]; then
+		mysql -u adiffpirate \
+			-e "INSERT INTO recon.targets (program, domain) VALUES ('${2}', '${1}');" &>/dev/null \
+			&& echo -e "\e[92mAdded | ${2} | ${1}\e[0m" \
+			|| echo -e "\e[90m${1} already exists\e[0m"
+	else
+		if [[ -n "${1}" ]]; then
+			mysql -u adiffpirate \
+				-e "INSERT INTO recon.targets (domain) VALUES ('${1}');" &>/dev/null \
+				&& echo -e "\e[92mAdded | NULL | ${1}\e[0m" \
+				|| echo -e "\e[90m${1} already exists\e[0m"
+		else
+			echo "ERROR: No arguments provided"
+		fi
+	fi
+}
+
+updatetargets(){
+	curl https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/master/data/wildcards.txt \
+		| egrep "^\*" | sed 's/^..//g;/\*/d' | while read domain; do addtarget $domain; done
+}
+
+addtodb(){
+	local input=$(mktemp)
+	cat /dev/stdin > $input
+	local currentTimestamp=$(date "+%Y-%m-%d %T")
+
+	if [[ $1 == 'subs' ]]; then
+		# Parse all subdomains to extract the domains using awk, then sort and unique them 
+		# and set all subdomains under these domains to dead (alive = 0)
+		cat $input | awk '{print $1}' | awk -F. '{print $(NF-1)"."$NF}' | sort -u \
+			| while read domain; do mysql -e "UPDATE recon.data SET alive = 0 WHERE alive = 1 AND domain = '${domain}'"; done
+		
+		cat $input | while read line; do
+			# line schema: $subdomain $source $alive (e.g. example.com testsource dead)
+			local subdomain=$(echo $line | awk '{print $1}')
+			local domain=$(echo $subdomain | awk -F. '{print $(NF-1)"."$NF}')
+			local source=$(echo $line | awk '{print $2}')
+			local alive=$(echo $line | grep ' alive' >/dev/null && echo 1 || echo 0)
+			mysql -e "INSERT INTO recon.data (domain, subdomain, alive, source) VALUES ('$domain', '${subdomain}', ${alive}, '${source}');" &> /dev/null \
+				|| { [[ $alive -eq 1 ]] && mysql -e "UPDATE recon.data SET alive = 1 WHERE subdomain = '${subdomain}'"; }
+		done
+		echo "$(mysql -Be "select subdomain from recon.data where created>='$currentTimestamp'" | tail -n +2 | wc -l) creations in database" >&2
+		echo "$(mysql -Be "select subdomain from recon.data where modified>='$currentTimestamp'" | tail -n +2 | wc -l) modifications in database" >&2
+	fi; if [[ $1 == 'tkos' ]]; then
+		cat $input | while read line; do
+			local url=$(echo $line | awk '{print $1}')
+			local service=$(echo $line | awk '{print $2}')
+			mysql -e "INSERT INTO recon.takeovers (url, service) VALUES ('$url', '$service');" &> /dev/null \
+				|| mysql -e "UPDATE recon.takeovers SET modified = '$currentTimestamp' WHERE url = '$url'"
+			
+		done
+		# If new possible takeovers were added to db send the full db to slack channel
+		if [[ $(mysql -Be "SELECT url FROM recon.takeovers WHERE created>='$currentTimestamp'" | tail -n +2 | wc -l) -gt 0 ]]; then 
+			http POST https://slack.com/api/chat.postMessage Authorization:"Bearer $SLACK_TOKEN" channel="C015Y6YPN8N" \
+				text="$(mysql -Be 'SELECT url,service,modified FROM recon.takeovers ORDER BY service,modified' | tail -n +2 | awk '{print $2" "$3"\n"$1}')" --ignore-stdin &> /dev/null
+		fi
+	fi
+	rm $input
+}
+
+adreconfull(){
+	while read domain; do 
+		updatetools
+		echo $domain | adrecon $1 <(getsubs alive $domain) | addtodb subs
+	done |& tee ~/logs/adrecon/$(date "+%Y-%m-%d+%T")
+}
+
+adrecon24h(){
+	while true; do 
+		gettargets | adreconfull $1
+	done
+}
+
+subtkofull(){
+	echo "----------" >&2
+	echo -e "\e[90m$(date "+%d/%m/%y %H:%M:%S")\e[0m" >&2
+	echo "Testing takeover on each subdomain that starts with the letter:" >&2
+	for letter in {a..z}; do
+		echo -n "${letter}: " >&2
+		mysql -Be "SELECT subdomain FROM recon.data WHERE subdomain LIKE '${letter}%'" | tail -n +2 | subtko | addtodb tkos
+	done
+	echo -e "\e[90m$(date "+%d/%m/%y %H:%M:%S")\e[0m" >&2
+	echo "----------" >&2
+}
+
+subtko24h(){
+	while true; do
+		subtkofull |& tee ~/logs/subtko/$(date "+%Y-%m-%d+%T")
+	done
+}

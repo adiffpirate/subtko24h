@@ -1,5 +1,5 @@
 #!/bin/bash
-source ~/.bash_aliases
+source ~/hacktools/.aliases
 export amass subfinder gitsubs resolve nonwc makesubwl getsubs
 
 passive(){
