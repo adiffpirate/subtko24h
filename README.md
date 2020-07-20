@@ -1,6 +1,6 @@
 # SubTko24h
 
-A 24/7 subdomain takeovers finder.
+A 24/7 subdomain takeovers finder that glues together some open source tools using bash.
 
 > Subdomain takeover is a type of vulnerability where the attacker has total control of a subdomain. It can be used to chain other vulns (like XSS), for mass phishing campaigns (that's almost impossible for the user to detect), and some other things. You can read more about it [here](https://www.hackerone.com/blog/Guide-Subdomain-Takeovers).
 
