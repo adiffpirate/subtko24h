@@ -1,8 +1,8 @@
-id: jolokia instance
+id: jolokia-instance
 
 info:
   name: Jolokia Version Disclosure
-  author: mavericknerd
+  author: mavericknerd & dwisiswant0
   severity: low
 
 requests:
@@ -10,10 +10,14 @@ requests:
     path:
       - '{{BaseURL}}/jolokia/version'
       - '{{BaseURL}}:8080/jolokia/version'
+    matchers-condition: and
     matchers:
       - type: word
         words:
+          - '"timestamp":'
+          - '"protocol":'
           - '"agent":'
+        condition: and
       - type: status
         status:
           - 200

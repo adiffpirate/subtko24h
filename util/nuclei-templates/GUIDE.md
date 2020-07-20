@@ -61,6 +61,8 @@ info:
   author: Ice3man
   # Severity is the severity for the template.
   severity: medium
+  #  Description optionally describes the template.
+  description: Searches for the pattern /.git/config on passed URLs.
 ```
 
 Actual requests and corresponding matchers are placed below the info block and they perform the task of making requests to target servers and finding if the template request was successful.
@@ -423,6 +425,7 @@ info:
   name: Git Config File
   author: Ice3man
   severity: medium
+  description: Searches for the pattern /.git/config on passed URLs.
 
 requests:
   - method: GET
@@ -525,6 +528,7 @@ info:
   name: Dummy A dns request
   author: mzack9999
   severity: none
+  description: Checks if CNAME and A record is returned.
 
 dns:
   - name: "{{FQDN}}"
@@ -555,6 +559,7 @@ id: workflow-example
 info:
   name: Jira-Pawner
   author: mzack9999
+  description: Detect Jira and if found; then check for CVEs in list.
 
 variables:
 
@@ -563,18 +568,18 @@ variables:
   # relative path support is now added into the nuclei engine for better UX. 
   
   jira: panels/detect-jira.yaml
-  jira-cve-1: cves/CVE-2018-20824.yaml
-  jira-cve-2: cves/CVE-2019-3399.yaml
-  jira-cve-3: cves/CVE-2019-11581.yaml
-  jira-cve-4: cves/CVE-2017-18101.yaml
+  jira_cve_1: cves/CVE-2018-20824.yaml
+  jira_cve_2: cves/CVE-2019-3399.yaml
+  jira_cve_3: cves/CVE-2019-11581.yaml
+  jira_cve_4: cves/CVE-2017-18101.yaml
 
 logic: 
     |
   if jira() {
-    jira-cve-1()
-    jira-cve-2()
-    jira-cve-3()
-    jira-cve-4()
+    jira_cve_1()
+    jira_cve_2()
+    jira_cve_3()
+    jira_cve_4()
 
   }
 ```
@@ -586,6 +591,7 @@ id: workflow-example
 info:
   name: Jira-Pawner
   author: mzack9999
+  description: Detect Jira and if found; perform custom pwn.
 
 variables:
 
@@ -594,14 +600,14 @@ variables:
   # relative path support is now added into the nuclei engine for better UX. 
 
   jira: panels/detect-jira.yaml
-  jira-pwn: my-jira-templates/
+  jira_pwn: my-jira-templates/
 
  # defining directory to run all the templates
 
 logic: 
     |
   if jira() {
-    jira-pwn()
+    jira_pwn()
 
   }
 ```
