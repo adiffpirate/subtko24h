@@ -2,10 +2,9 @@
 source ~/.tokens
 
 set -a
-hacktools="~/hacktools"
+hacktools="$HOME/hacktools"
 goBin="${hacktools}/go/bin"
 cBin="${hacktools}/c/bin"
-bashPath="${hacktools}/bash"
 pyPath="${hacktools}/python"
 
 count(){
@@ -13,14 +12,10 @@ count(){
 }
 
 freshr(){
-	# if one day has passed since last run
-	if [ $(date +%s) -ge $((( $(cat ${hacktools}/util/.lastFreshrDate) + 86400 ))) ]; then
-		date +%s > ${hacktools}/util/.lastFreshrDate
-		echo -n "Freshing up resolvers"
-		python3 ${pyPath}/fresh.py --clean ${hacktools}/util/clean_regex.txt \
-			-o ${hacktools}/util/resolvers.txt &> /dev/null
-		echo -en "\r\e[K" #clear the last line in stdout
-	fi
+	echo -n "Freshing up resolvers"
+	python3 ${pyPath}/fresh.py --clean ${hacktools}/util/clean_regex.txt \
+		-o ${hacktools}/util/resolvers.txt |& grep "erro"
+	echo -en "\r\e[K" #clear the last line in stdout
 }
 
 amass(){
@@ -42,7 +37,6 @@ gitsubs(){
 }
 
 massdns(){
-	freshr
 	if [[ -n $1 ]]; then
 		local resolvers="$1"
 	else
@@ -191,6 +185,7 @@ adreconfull(){
 
 adrecon24h(){
 	while true; do 
+		freshr
 		gettargets | adreconfull $1
 	done
 }
