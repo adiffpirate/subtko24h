@@ -169,7 +169,7 @@ addtodb(){
 		done
 		# If new possible takeovers were added to db send the full db to slack channel
 		if [[ $(mysql -Be "SELECT url FROM recon.takeovers WHERE created>='$currentTimestamp'" | tail -n +2 | wc -l) -gt 0 ]]; then 
-			http POST https://slack.com/api/chat.postMessage Authorization:"Bearer $SLACK_TOKEN" channel="C015Y6YPN8N" \
+			http POST https://slack.com/api/chat.postMessage Authorization:"Bearer $SLACK_TOKEN" channel="$SLACK_CHANNEL" \
 				text="$(mysql -Be 'SELECT url,service,modified FROM recon.takeovers ORDER BY service,modified' | tail -n +2 | awk '{print $2" "$3"\n"$1}')" --ignore-stdin &> /dev/null
 		fi
 	fi
